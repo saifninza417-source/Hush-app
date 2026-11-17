@@ -1,0 +1,16 @@
+{
+  "name": "hush-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hush: anonymous feelings-sharing app with its own small server.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
