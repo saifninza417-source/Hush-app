@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Hush Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#f3f1ed;color:#1c1e23;padding:16px;max-width:720px;margin:0 auto}
+h1{font-size:22px;margin:6px 0 14px}.card{background:#fff;border:1px solid #e6e2da;border-radius:16px;padding:14px;margin-bottom:12px}
+input{width:100%;padding:12px;border:1px solid #d8d3c8;border-radius:12px;font:inherit}
+button{border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;color:#fff;background:#D9731A;cursor:pointer}
+button.alt{background:#777b85}button.red{background:#c0392b}
+.meta{font-size:12.5px;color:#777b85;margin-bottom:6px;word-break:break-all}.txt{white-space:pre-wrap;line-height:1.5;margin:6px 0 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.reply{margin:8px 0 0 14px;padding:8px 10px;background:#f6f5f2;border-radius:10px}
+.err{color:#c0392b;font-size:14px;margin-top:8px}
+</style></head><body>
+<h1>Hush Admin</h1>
+<div class="card" id="login">
+  <input id="key" type="password" placeholder="Admin key" autocomplete="current-password">
+  <div class="row" style="margin-top:10px"><button id="go">Enter</button></div>
+  <div class="err" id="err"></div>
+</div>
+<div id="panel" hidden>
+  <div class="card"><b>Blocked IPs</b><div id="blocked" class="meta" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:8px"><input id="unip" placeholder="IP to unblock" style="flex:1"><button class="alt" id="unb">Unblock</button></div></div>
+  <div id="list"></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);let KEY=sessionStorage.getItem("hush_admin")||"";
+async function call(path,method,body){
+  const r=await fetch(path,{method:method||"GET",headers:{"Content-Type":"application/json","X-Admin-Key":KEY},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Error");return j;
+}
+const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+async function load(){
+  try{
+    const d=await call("/api/admin/posts");
+    sessionStorage.setItem("hush_admin",KEY);$("#login").hidden=true;$("#panel").hidden=false;
+    $("#blocked").textContent=d.blocked.length?d.blocked.join(", "):"None";
+    const L=$("#list");L.textContent="";
+    d.posts.forEach(p=>{
+      const c=mk("div","card");
+      c.appendChild(mk("div","meta",(p.alias||"")+" · "+(p.gender||"")+" · "+(p.mood||"")+" · "+new Date(p.ts).toLocaleString()+" · IP: "+(p._ip||"unknown")+(p.flagged?" · FLAGGED":"")));
+      c.appendChild(mk("div","txt",p.text));
+      const row=mk("div","row");
+      const del=mk("button","red","Delete post");del.onclick=async()=>{if(confirm("Delete this post and its replies?")){await call("/api/admin/posts/"+encodeURIComponent(p.id),"DELETE");load()}};
+      row.appendChild(del);
+      if(p._ip){const bl=mk("button","alt","Block IP");bl.onclick=async()=>{if(confirm("Block "+p._ip+"?")){await call("/api/admin/block","POST",{ip:p._ip});load()}};row.appendChild(bl)}
+      c.appendChild(row);
+      d.replies.filter(r=>r.postId===p.id).forEach(r=>{
+        const w=mk("div","reply");w.appendChild(mk("div","meta",(r.alias||"")+" · IP: "+(r._ip||"unknown")));w.appendChild(mk("div","txt",r.text));
+        const rr=mk("div","row");
+        const rd=mk("button","red","Delete reply");rd.onclick=async()=>{await call("/api/admin/replies/"+encodeURIComponent(r.id),"DELETE");load()};rr.appendChild(rd);
+        if(r._ip){const rb=mk("button","alt","Block IP");rb.onclick=async()=>{if(confirm("Block "+r._ip+"?")){await call("/api/admin/block","POST",{ip:r._ip});load()}};rr.appendChild(rb)}
+        w.appendChild(rr);c.appendChild(w);
+      });
+      L.appendChild(c);
+    });
+  }catch(e){$("#err").textContent=e.message;$("#login").hidden=false;$("#panel").hidden=true;sessionStorage.removeItem("hush_admin")}
+}
+$("#go").onclick=()=>{KEY=$("#key").value;load()};
+$("#key").addEventListener("keydown",e=>{if(e.key==="Enter"){KEY=$("#key").value;load()}});
+$("#unb").onclick=async()=>{const ip=$("#unip").value.trim();if(ip){await call("/api/admin/unblock","POST",{ip});$("#unip").value="";load()}};
+if(KEY)load();
+</script></body></html>
